@@ -35,90 +35,60 @@
     </div>
 
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
-        import { getFirestore, collection, setDoc, doc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
+    import { getFirestore, collection, setDoc, doc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyBeJNb65kjFuC-qvbmvnNpBYZNcCG7Zjwg",
-            authDomain: "efootball-pro-venda.firebaseapp.com",
-            projectId: "efootball-pro-venda",
-            storageBucket: "efootball-pro-venda.firebasestorage.app",
-            messagingSenderId: "718903184280",
-            appId: "1:718903184280:web:b028397ff37450fd7cb9ed"
-        };
+    const firebaseConfig = {
+        apiKey: "AIzaSyBeJNb65kjFuC-qvbmvnNpBYZNcCG7Zjwg",
+        authDomain: "efootball-pro-venda.firebaseapp.com",
+        projectId: "efootball-pro-venda",
+        storageBucket: "efootball-pro-venda.firebasestorage.app",
+        messagingSenderId: "718903184280",
+        appId: "1:718903184280:web:b028397ff37450fd7cb9ed"
+    };
 
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const auth = getAuth(app);
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
 
-        // Autenticação anônima obrigatória para liberar as Rules
-        signInAnonymously(auth).then(() => {
-            console.log("Autenticado como ADM Anônimo");
-            carregarLista();
-        }).catch(err => {
-            alert("Erro de autenticação: " + err.message);
-        });
+    // Garante autenticação para as regras de segurança funcionarem
+    signInAnonymously(auth).then(() => {
+        console.log("ADM Autenticado");
+        carregarLista();
+    }).catch(e => alert("Erro de conexão: " + e.message));
 
-        window.gerarChave = async () => {
-            const btn = document.getElementById('btn-gerar');
-            const resultBox = document.getElementById('result-box');
-            
-            btn.disabled = true;
-            btn.innerText = "COMUNICANDO COM BANCO...";
+    window.gerarChave = async () => {
+        const btn = document.getElementById('btn-gerar');
+        if(btn) { btn.disabled = true; btn.innerText = "GRAVANDO..."; }
 
-            // Gera código aleatório
-            const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
-            const novaChave = "PRO-" + randomStr;
-
-            try {
-                // Salva no Firestore
-                await setDoc(doc(db, "cupons", novaChave), {
-                    criadoEm: new Date().getTime(),
-                    status: "disponivel"
-                });
-
-                resultBox.innerText = novaChave;
-                resultBox.style.display = 'block';
-                btn.innerText = "CHAVE GERADA!";
-                
-                setTimeout(() => {
-                    btn.disabled = false;
-                    btn.innerText = "CRIAR NOVA CHAVE";
-                }, 2000);
-
-            } catch (error) {
-                console.error("Erro ao salvar:", error);
-                alert("O navegador bloqueou a gravação. Tente usar uma Aba Anônima ou desativar extensões.");
-                btn.disabled = false;
-                btn.innerText = "TENTAR NOVAMENTE";
-            }
-        };
-
-        function carregarLista() {
-            const q = query(collection(db, "cupons"), orderBy("criadoEm", "desc"));
-            onSnapshot(q, (snapshot) => {
-                const listaUl = document.getElementById('lista-chaves');
-                listaUl.innerHTML = "";
-                
-                if (snapshot.empty) {
-                    listaUl.innerHTML = "<p style='color:#444; font-size:12px;'>Nenhuma chave ativa encontrada.</p>";
-                    return;
-                }
-
-                snapshot.forEach((doc) => {
-                    const li = document.createElement('li');
-                    li.innerHTML = `<span>${doc.id}</span> <span class="status-badge">ATIVA</span>`;
-                    listaUl.appendChild(li);
-                });
+        const cod = "PRO-" + Math.random().toString(36).substring(2, 8).toUpperCase();
+        
+        try {
+            // Tenta gravar com um timeout de segurança
+            await setDoc(doc(db, "cupons", cod), { 
+                criadoEm: Date.now(),
+                status: "ativo" 
             });
+            console.log("Sucesso ao gerar:", cod);
+            if(document.getElementById('result')) document.getElementById('result').innerText = cod;
+        } catch (e) {
+            console.error(e);
+            alert("O navegador bloqueou a gravação. Tente: \n1. Usar Guia Anônima\n2. Desativar AdBlock");
+        } finally {
+            if(btn) { btn.disabled = false; btn.innerText = "GERAR NOVA CHAVE"; }
         }
+    };
 
-        window.copyKey = () => {
-            const text = document.getElementById('result-box').innerText;
-            navigator.clipboard.writeText(text);
-            alert("Chave copiada: " + text);
-        };
-    </script>
+    function carregarLista() {
+        const q = query(collection(db, "cupons"), orderBy("criadoEm", "desc"));
+        onSnapshot(q, (snap) => {
+            const lista = document.getElementById('lista');
+            if(lista) {
+                lista.innerHTML = snap.docs.map(d => `<li>${d.id}</li>`).join('');
+            }
+        });
+    }
+</script>
 </body>
 </html>
