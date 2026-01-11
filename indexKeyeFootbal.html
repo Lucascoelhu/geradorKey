@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>ADM - Gerador de Cupons</title>
+    <style>
+        body { background: #05070a; color: white; font-family: sans-serif; text-align: center; padding: 40px; }
+        .box { background: #12161d; border: 1px solid #00ff88; padding: 20px; border-radius: 15px; display: inline-block; }
+        button { background: #00ff88; border: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; cursor: pointer; }
+        .cupom { font-size: 24px; color: #00ff88; margin: 20px; font-family: monospace; }
+        li { list-style: none; background: #000; margin: 5px; padding: 10px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h2>GERAR CHAVE PRO</h2>
+        <button onclick="gerar()">CRIAR NOVA CHAVE</button>
+        <div id="result" class="cupom"></div>
+        <hr>
+        <h4>Chaves Disponíveis no Banco:</h4>
+        <div id="lista"></div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
+        import { getFirestore, collection, setDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBeJNb65kjFuC-qvbmvnNpBYZNcCG7Zjwg",
+            authDomain: "efootball-pro-venda.firebaseapp.com",
+            projectId: "efootball-pro-venda",
+            storageBucket: "efootball-pro-venda.firebasestorage.app",
+            messagingSenderId: "718903184280",
+            appId: "1:718903184280:web:b028397ff37450fd7cb9ed"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        window.gerar = async () => {
+            const cod = "PRO-" + Math.random().toString(36).substring(2, 9).toUpperCase();
+            await setDoc(doc(db, "cupons", cod), { status: "ativo" });
+            document.getElementById('result').innerText = cod;
+        };
+
+        onSnapshot(collection(db, "cupons"), (snap) => {
+            document.getElementById('lista').innerHTML = snap.docs.map(d => `<li>${d.id}</li>`).join('');
+        });
+    </script>
+</body>
+</html>
