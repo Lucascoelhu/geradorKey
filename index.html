@@ -2,87 +2,123 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>ADM - Gerador de Cupons</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ADM - Gerador de Chaves</title>
     <style>
-        body { background: #05070a; color: white; font-family: sans-serif; text-align: center; padding: 40px; }
-        .box { background: #12161d; border: 1px solid #00ff88; padding: 20px; border-radius: 15px; display: inline-block; }
-        button { background: #00ff88; border: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; cursor: pointer; }
-        .cupom { font-size: 24px; color: #00ff88; margin: 20px; font-family: monospace; }
-        li { list-style: none; background: #000; margin: 5px; padding: 10px; border-radius: 5px; }
+        body { background: #05070a; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+        .card { background: #12161d; padding: 30px; border-radius: 20px; border: 1px solid #00ff88; text-align: center; width: 90%; max-width: 400px; box-shadow: 0 10px 30px rgba(0,255,136,0.1); }
+        button { background: #00ff88; border: none; padding: 15px 30px; font-weight: bold; border-radius: 10px; cursor: pointer; font-size: 16px; width: 100%; transition: 0.3s; }
+        button:disabled { background: #222; color: #555; cursor: not-allowed; }
+        .chave-box { margin: 20px 0; font-size: 22px; color: #00ff88; font-family: monospace; background: #000; padding: 15px; border-radius: 8px; border: 1px dashed #00ff88; display: none; cursor: pointer; }
+        .lista-section { text-align: left; margin-top: 30px; width: 100%; border-top: 1px solid #232931; padding-top: 20px; }
+        ul { padding: 0; margin: 0; }
+        li { background: #1a1f26; margin: 8px 0; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 14px; display: flex; justify-content: space-between; border: 1px solid #232931; }
+        .status-badge { font-size: 10px; background: #00ff88; color: #000; padding: 2px 6px; border-radius: 4px; font-weight: bold; }
     </style>
 </head>
 <body>
-    <div class="box">
-        <h2>GERAR CHAVE PRO</h2>
-        <button onclick="gerar()">CRIAR NOVA CHAVE</button>
-        <div id="result" class="cupom"></div>
-        <hr>
-        <h4>Chaves Disponíveis no Banco:</h4>
-        <div id="lista"></div>
+
+    <div class="card">
+        <h2 style="margin-top:0;">PAINEL ADMIN</h2>
+        <p style="font-size: 12px; color: #777; margin-bottom: 25px;">Gere chaves PRO para seus clientes</p>
+        
+        <button id="btn-gerar" onclick="gerarChave()">CRIAR NOVA CHAVE</button>
+        
+        <div id="result-box" class="chave-box" onclick="copyKey()"></div>
+        
+        <div class="lista-section">
+            <h4 style="color: #00ff88; margin-bottom: 15px;">Chaves Disponíveis (${document.querySelectorAll('li').length}):</h4>
+            <ul id="lista-chaves">
+                <p style="color:#444; font-size:12px;">Carregando banco de dados...</p>
+            </ul>
+        </div>
     </div>
 
     <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
-    import { getFirestore, collection, setDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
-    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
+        import { getFirestore, collection, setDoc, doc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
 
-    const firebaseConfig = {
-        apiKey: "AIzaSyBeJNb65kjFuC-qvbmvnNpBYZNcCG7Zjwg",
-        authDomain: "efootball-pro-venda.firebaseapp.com",
-        projectId: "efootball-pro-venda",
-        storageBucket: "efootball-pro-venda.firebasestorage.app",
-        messagingSenderId: "718903184280",
-        appId: "1:718903184280:web:b028397ff37450fd7cb9ed"
-    };
+        const firebaseConfig = {
+            apiKey: "AIzaSyBeJNb65kjFuC-qvbmvnNpBYZNcCG7Zjwg",
+            authDomain: "efootball-pro-venda.firebaseapp.com",
+            projectId: "efootball-pro-venda",
+            storageBucket: "efootball-pro-venda.firebasestorage.app",
+            messagingSenderId: "718903184280",
+            appId: "1:718903184280:web:b028397ff37450fd7cb9ed"
+        };
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const auth = getAuth(app);
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
 
-    // Força um login anônimo para o gerador ter permissão de escrita
-    // se você não estiver logado como administrador
-    onAuthStateChanged(auth, (user) => {
-        if (!user) {
-            signInAnonymously(auth).catch(e => console.error("Erro auth:", e));
-        }
-    });
+        // Autenticação anônima obrigatória para liberar as Rules
+        signInAnonymously(auth).then(() => {
+            console.log("Autenticado como ADM Anônimo");
+            carregarLista();
+        }).catch(err => {
+            alert("Erro de autenticação: " + err.message);
+        });
 
-    window.gerar = async () => {
-        const btn = document.querySelector('button');
-        btn.disabled = true;
-        btn.innerText = "GERANDO...";
+        window.gerarChave = async () => {
+            const btn = document.getElementById('btn-gerar');
+            const resultBox = document.getElementById('result-box');
+            
+            btn.disabled = true;
+            btn.innerText = "COMUNICANDO COM BANCO...";
 
-        // Gera código curto e fácil de ler
-        const cod = "PRO-" + Math.random().toString(36).substring(2, 7).toUpperCase();
-        
-        try {
-            console.log("Tentando salvar chave:", cod);
-            await setDoc(doc(db, "cupons", cod), { 
-                status: "ativo",
-                criadoEm: new Date().toISOString() 
+            // Gera código aleatório
+            const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
+            const novaChave = "PRO-" + randomStr;
+
+            try {
+                // Salva no Firestore
+                await setDoc(doc(db, "cupons", novaChave), {
+                    criadoEm: new Date().getTime(),
+                    status: "disponivel"
+                });
+
+                resultBox.innerText = novaChave;
+                resultBox.style.display = 'block';
+                btn.innerText = "CHAVE GERADA!";
+                
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.innerText = "CRIAR NOVA CHAVE";
+                }, 2000);
+
+            } catch (error) {
+                console.error("Erro ao salvar:", error);
+                alert("O navegador bloqueou a gravação. Tente usar uma Aba Anônima ou desativar extensões.");
+                btn.disabled = false;
+                btn.innerText = "TENTAR NOVAMENTE";
+            }
+        };
+
+        function carregarLista() {
+            const q = query(collection(db, "cupons"), orderBy("criadoEm", "desc"));
+            onSnapshot(q, (snapshot) => {
+                const listaUl = document.getElementById('lista-chaves');
+                listaUl.innerHTML = "";
+                
+                if (snapshot.empty) {
+                    listaUl.innerHTML = "<p style='color:#444; font-size:12px;'>Nenhuma chave ativa encontrada.</p>";
+                    return;
+                }
+
+                snapshot.forEach((doc) => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `<span>${doc.id}</span> <span class="status-badge">ATIVA</span>`;
+                    listaUl.appendChild(li);
+                });
             });
-            document.getElementById('result').innerText = cod;
-            console.log("Salvo com sucesso!");
-        } catch (e) {
-            console.error("Erro detalhado:", e);
-            alert("Erro ao salvar no banco. Verifique o console ou tente aba anônima.");
-        } finally {
-            btn.disabled = false;
-            btn.innerText = "CRIAR NOVA CHAVE";
         }
-    };
 
-    // Monitora a lista em tempo real
-    onSnapshot(collection(db, "cupons"), (snap) => {
-        const lista = document.getElementById('lista');
-        if (snap.empty) {
-            lista.innerHTML = "<p style='color:#555'>Nenhuma chave ativa.</p>";
-        } else {
-            lista.innerHTML = snap.docs.map(d => `<li>${d.id}</li>`).join('');
-        }
-    }, (error) => {
-        console.error("Erro ao listar:", error);
-    });
-</script> 
+        window.copyKey = () => {
+            const text = document.getElementById('result-box').innerText;
+            navigator.clipboard.writeText(text);
+            alert("Chave copiada: " + text);
+        };
+    </script>
 </body>
 </html>
