@@ -22,30 +22,67 @@
     </div>
 
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
-        import { getFirestore, collection, setDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
+    import { getFirestore, collection, setDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyBeJNb65kjFuC-qvbmvnNpBYZNcCG7Zjwg",
-            authDomain: "efootball-pro-venda.firebaseapp.com",
-            projectId: "efootball-pro-venda",
-            storageBucket: "efootball-pro-venda.firebasestorage.app",
-            messagingSenderId: "718903184280",
-            appId: "1:718903184280:web:b028397ff37450fd7cb9ed"
-        };
+    const firebaseConfig = {
+        apiKey: "AIzaSyBeJNb65kjFuC-qvbmvnNpBYZNcCG7Zjwg",
+        authDomain: "efootball-pro-venda.firebaseapp.com",
+        projectId: "efootball-pro-venda",
+        storageBucket: "efootball-pro-venda.firebasestorage.app",
+        messagingSenderId: "718903184280",
+        appId: "1:718903184280:web:b028397ff37450fd7cb9ed"
+    };
 
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
 
-        window.gerar = async () => {
-            const cod = "PRO-" + Math.random().toString(36).substring(2, 9).toUpperCase();
-            await setDoc(doc(db, "cupons", cod), { status: "ativo" });
+    // Força um login anônimo para o gerador ter permissão de escrita
+    // se você não estiver logado como administrador
+    onAuthStateChanged(auth, (user) => {
+        if (!user) {
+            signInAnonymously(auth).catch(e => console.error("Erro auth:", e));
+        }
+    });
+
+    window.gerar = async () => {
+        const btn = document.querySelector('button');
+        btn.disabled = true;
+        btn.innerText = "GERANDO...";
+
+        // Gera código curto e fácil de ler
+        const cod = "PRO-" + Math.random().toString(36).substring(2, 7).toUpperCase();
+        
+        try {
+            console.log("Tentando salvar chave:", cod);
+            await setDoc(doc(db, "cupons", cod), { 
+                status: "ativo",
+                criadoEm: new Date().toISOString() 
+            });
             document.getElementById('result').innerText = cod;
-        };
+            console.log("Salvo com sucesso!");
+        } catch (e) {
+            console.error("Erro detalhado:", e);
+            alert("Erro ao salvar no banco. Verifique o console ou tente aba anônima.");
+        } finally {
+            btn.disabled = false;
+            btn.innerText = "CRIAR NOVA CHAVE";
+        }
+    };
 
-        onSnapshot(collection(db, "cupons"), (snap) => {
-            document.getElementById('lista').innerHTML = snap.docs.map(d => `<li>${d.id}</li>`).join('');
-        });
-    </script>
+    // Monitora a lista em tempo real
+    onSnapshot(collection(db, "cupons"), (snap) => {
+        const lista = document.getElementById('lista');
+        if (snap.empty) {
+            lista.innerHTML = "<p style='color:#555'>Nenhuma chave ativa.</p>";
+        } else {
+            lista.innerHTML = snap.docs.map(d => `<li>${d.id}</li>`).join('');
+        }
+    }, (error) => {
+        console.error("Erro ao listar:", error);
+    });
+</script> 
 </body>
 </html>
